@@ -2,10 +2,21 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal
 import models, schemas
+from auth import create_token, verify_token
+
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+
+# Login
+@app.post("/login")
+def login():
+  return {
+    "access_token": create_token({"user": "admin"}),
+    "token_type": "bearer"
+  }
 
 #db dependency
 def get_db():
@@ -22,9 +33,9 @@ def home():
     "Message": "Blog api "
   }
 
-# Create Blog
+# Create Blog (Protected)
 @app.post("/blogs", response_model=schemas.BlogResponse)
-def create_blog(blog:schemas.BlogCreate, db:Session = Depends(get_db)):
+def create_blog(blog:schemas.BlogCreate, db:Session = Depends(get_db), user = Depends(verify_token)):
   new_blog = models.Blog(
     title = blog.title,
     content = blog.content
@@ -51,9 +62,9 @@ def get_blog(id:int, db: Session = Depends(get_db)):
   return blog
 
 
-# Update blog
+# Update blog (Protected)
 @app.put("/blogs/{id}", response_model=schemas.BlogResponse)
-def update_blog(id:int, blog: schemas.BlogCreate, db: Session = Depends(get_db)):
+def update_blog(id:int, blog: schemas.BlogCreate, db: Session = Depends(get_db), user = Depends(verify_token)):
   existing_blog = db.query(models.Blog).filter(models.Blog.id == id).first()
   if not existing_blog:
     raise HTTPException(status_code=404, detail="Blog not found")
@@ -66,9 +77,9 @@ def update_blog(id:int, blog: schemas.BlogCreate, db: Session = Depends(get_db))
 
   return existing_blog
 
-# Delete Blog
+# Delete Blog (Protected)
 @app.delete("/blogs/{id}")
-def delete_blog(id:int, db: Session = Depends(get_db)):
+def delete_blog(id:int, db: Session = Depends(get_db), user = Depends(verify_token)):
   blog = db.query(models.Blog).filter(models.Blog.id == id).first()
   if not blog:
      raise HTTPException(status_code=404, detail="Blog not found")
@@ -77,4 +88,3 @@ def delete_blog(id:int, db: Session = Depends(get_db)):
   db.commit()
 
   return {"Message": "Blog deleted"}
-
